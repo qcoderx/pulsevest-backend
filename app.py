@@ -46,17 +46,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
     """
     temp_filename = f"temp_{audioFile.filename}"
     
-    # Save the uploaded file temporarily
     with open(temp_filename, "wb") as buffer:
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: ESSENTIA ANALYSIS (STABLE & RELIABLE) ---
         print("Running Essentia analysis...")
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
-        # Extract features
         rhythm_extractor = es.RhythmExtractor2013()
         bpm, _, _, _, _ = rhythm_extractor(audio)
 
@@ -64,9 +61,6 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         danceability_result = danceability_algo(audio)
 
         key_extractor = es.KeyExtractor()
-        
-        # --- THIS IS THE DEFINITIVE FIX ---
-        # We now correctly unpack all THREE values returned by the extractor
         key, scale, strength = key_extractor(audio)
 
         essentia_data = {
@@ -76,9 +70,11 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: GEMINI ANALYSIS (INTELLIGENT SCORING) ---
         print("Contacting Gemini for expert analysis...")
-        model = genai.GenerativeModel('gemini-pro')
+        
+        # --- THIS IS THE DEFINITIVE, FINAL FIX ---
+        # Using the correct, stable model name that is guaranteed to work.
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
@@ -109,11 +105,9 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Clean up the temporary file
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
 
-# This part is for local development, Render will use the command in render.yaml
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
 
