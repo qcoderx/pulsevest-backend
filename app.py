@@ -1,47 +1,59 @@
 import os
 import json
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import shutil
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import google.generativeai as genai
 import essentia.standard as es
 
 # --- SETUP ---
-load_dotenv() # Load environment variables from .env file
+load_dotenv()
 
-app = Flask(__name__)
-# Allow requests from your Next.js frontend
-CORS(app, resources={r"/analyze": {"origins": "http://localhost:3000"}})
+app = FastAPI(title="PulseVest Analysis Engine")
+
+# Configure CORS to allow requests from your Next.js frontend
+origins = [
+    "http://localhost:3000",
+    # Add your deployed frontend URL here in the future
+    # "https://www.pulsevest.app", 
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Configure the Gemini API client
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY not found in .env file")
+    raise ValueError("GOOGLE_API_KEY not found in environment variables")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- THE ANALYSIS ENDPOINT ---
-@app.route('/analyze', methods=['POST'])
-def analyze_audio():
+@app.post("/analyze")
+async def analyze_audio(audioFile: UploadFile = File(...)):
     """
-    Receives an audio file, analyzes it with Essentia,
+    Receives an audio file, saves it temporarily, analyzes it with Essentia,
     gets a score from Gemini, and returns the full analysis.
     """
-    if 'audioFile' not in request.files:
-        return jsonify({"error": "No audio file provided"}), 400
-
-    file = request.files['audioFile']
+    temp_filename = f"temp_{audioFile.filename}"
     
-    # Create a temporary file to store the upload
-    temp_filename = "temp_audio_file"
-    file.save(temp_filename)
+    # Save the uploaded file temporarily
+    try:
+        with open(temp_filename, "wb") as buffer:
+            shutil.copyfileobj(audioFile.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save temporary file: {e}")
 
     try:
-        # --- STAGE 1: ESSENTIA.JS ANALYSIS (STABLE & RELIABLE) ---
+        # --- STAGE 1: ESSENTIA ANALYSIS (STABLE & RELIABLE) ---
         print("Running Essentia analysis...")
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
-        # Extract features
         rhythm_extractor = es.RhythmExtractor2013()
         bpm, _, _, _, _ = rhythm_extractor(audio)
 
@@ -78,23 +90,24 @@ def analyze_audio():
         Your final output MUST be a single, valid JSON object with no extra text or markdown formatting.
         """
 
-        response = model.generate_content(prompt)
-        # Clean up the response to ensure it's valid JSON
+        response = await model.generate_content_async(prompt)
         cleaned_json = response.text.replace('```json', '').replace('```', '').strip()
         
         print("Gemini Analysis Complete.")
         analysis_result = json.loads(cleaned_json)
 
-        return jsonify(analysis_result)
+        return analysis_result
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         # Clean up the temporary file
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
 
-# --- RUN THE SERVER ---
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+# --- A simple health check endpoint ---
+@app.get("/")
+def read_root():
+    return {"message": "PulseVest FastAPI Analysis Engine is running."}
+

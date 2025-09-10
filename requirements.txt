@@ -1,5 +1,7 @@
-Flask
+fastapi
 python-dotenv
 google-generativeai
 essentia
-Flask-Cors
+uvicorn
+gunicorn
+python-multipart # Required by FastAPI for form data
