@@ -4,4 +4,4 @@ google-generativeai
 essentia
 uvicorn
 gunicorn
-python-multipart # Required by FastAPI for form data
+python-multipart
