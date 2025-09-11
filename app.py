@@ -80,13 +80,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         """
         
         completion = client.chat.completions.create(
-            # --- THIS IS THE DEFINITIVE FIX: USING THE CORRECT, SUPPORTED MODEL NAME ---
-            model="deepseek-ai/DeepSeek-V3-0324", 
+            model="meta-llama/Llama-3.1-8B-Instruct:cerebras", 
             messages=[
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
             max_tokens=1024,
+            # --- THIS IS THE DEFINITIVE FIX: FORCING A JSON RESPONSE ---
+            response_format={"type": "json_object"},
         )
 
         print("Hugging Face Analysis Complete.")
@@ -96,10 +97,8 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         if not message_content:
              raise ValueError("Received an empty response from the AI model.")
 
-        # Clean the response to ensure it's valid JSON
-        cleaned_json = message_content.replace('```json', '').replace('```', '').strip()
-        
-        return json.loads(cleaned_json)
+        # The response is now guaranteed to be a JSON string, so no extra cleaning is needed
+        return json.loads(message_content)
 
     except Exception as e:
         print(f"An error occurred: {e}")
