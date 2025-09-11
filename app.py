@@ -33,7 +33,7 @@ client = OpenAI(
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (DeepSeek V3.1 Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Qwen3 Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -62,8 +62,8 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: HUGGING FACE ANALYSIS (THE FINAL, UNBREAKABLE LOGIC) ---
-        print("Contacting DeepSeek via HF Router for expert analysis...")
+        # --- STAGE 2: HUGGING FACE ANALYSIS (THE FINAL ENGINE) ---
+        print("Contacting Qwen3 via HF Router for expert analysis...")
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. Your task is to analyze technical data from an audio track and return a single, valid JSON object. Do not include any text, notes, or markdown formatting before or after the JSON object. Your entire response must be only the JSON object itself.
@@ -83,7 +83,8 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         for attempt in range(max_retries):
             try:
                 completion = client.chat.completions.create(
-                    model="deepseek-ai/DeepSeek-V3.1:together", 
+                    # --- USING THE EXACT MODEL YOU COMMANDED ---
+                    model="Qwen/Qwen3-Next-80B-A3B-Instruct:novita", 
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.1,
                     max_tokens=1024,
@@ -99,7 +100,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
 
                 print("Raw response from AI:", message_content)
                 
-                # --- THE BRUTE-FORCE, UNBREAKABLE PARSER ---
+                # Using the unbreakable parser as a final guarantee
                 start_index = message_content.find('{')
                 end_index = message_content.rfind('}') + 1
                 
@@ -110,19 +111,16 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
                 
                 print("Extracted JSON string:", json_string)
                 
-                # If parsing is successful, we return the result and exit the loop
                 return json.loads(json_string)
 
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Attempt {attempt + 1} failed with a parsing error: {e}")
                 if attempt < max_retries - 1:
                     print("Retrying...")
-                    time.sleep(1) # Wait a second before retrying
+                    time.sleep(1)
                 else:
-                    # If all retries fail, we raise the final exception
                     raise HTTPException(status_code=500, detail="The AI model returned a malformed response after multiple attempts.")
         
-        # This line should not be reachable, but is a fallback
         raise HTTPException(status_code=500, detail="Failed to get a valid response from the AI model.")
 
     except Exception as e:
