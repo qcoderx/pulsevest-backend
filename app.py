@@ -23,13 +23,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- NEW: CONFIGURE HUGGING FACE API CLIENT ---
+# --- NEW: CONFIGURE HUGGING FACE API CLIENT WITH A RELIABLE MODEL ---
 HF_TOKEN = os.getenv('HF_TOKEN')
 if not HF_TOKEN:
     raise ValueError("HF_TOKEN (Hugging Face Token) not found in .env file")
 
-# Using a powerful and reliable open-source model
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+# Using a powerful and reliable open-source model known to be available on the free tier
+API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
 
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
@@ -70,12 +70,13 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
             "Authorization": f"Bearer {HF_TOKEN}"
         }
 
-        prompt = f"""
-        [INST] You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
+        # --- RE-ENGINEERED PROMPT FOR THE ZEPHYR MODEL ---
+        prompt = f"""<|system|>
+        You are an expert A&R and music analyst for PulseVest. Your task is to analyze the provided technical data from an audio track and return a detailed assessment. Your response MUST be a single, valid JSON object with no extra text or markdown formatting.</s>
+        <|user|>
+        I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
 
-        Based ONLY on this technical data, provide a detailed assessment.
-        
-        Your analysis must cover these four categories:
+        Based ONLY on this technical data, provide a detailed assessment covering these four categories:
         1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
         2.  **Sound Quality:** Infer this based on the context of a demo. Acknowledge this is an inference.
         3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
@@ -83,14 +84,16 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
-        Your final output MUST be a single, valid JSON object with no extra text or markdown formatting. [/INST]
+        Your response must be ONLY the JSON object.</s>
+        <|assistant|>
         """
 
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 512,
+                "max_new_tokens": 1024,
                 "temperature": 0.7,
+                "return_full_text": False 
             }
         }
 
@@ -98,13 +101,12 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         response.raise_for_status()
 
         print("Hugging Face Analysis Complete.")
-        # The response is a list, we take the first item's generated text
         generated_text = response.json()[0]['generated_text']
         
-        # The model's response includes the original prompt, so we strip it out
-        json_response_string = generated_text.split("[/INST]")[-1].strip()
+        # Clean the response just in case the model adds stray characters
+        cleaned_json = generated_text.replace('```json', '').replace('```', '').strip()
         
-        return json.loads(json_response_string)
+        return json.loads(cleaned_json)
 
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err}")
