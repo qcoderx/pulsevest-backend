@@ -4,7 +4,7 @@ import traceback
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import requests  # We now use the standard 'requests' library
+import requests
 import essentia.standard as es
 import uvicorn
 
@@ -14,7 +14,7 @@ load_dotenv()
 app = FastAPI()
 
 # Configure CORS
-origins = ["http://localhost:3000"]
+origins = ["http://localhost:3000"] # Add your frontend's production URL here later
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -23,17 +23,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- NEW: CONFIGURE DEEPSEEK API CLIENT ---
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-if not DEEPSEEK_API_KEY:
-    raise ValueError("DEEPSEEK_API_KEY not found in .env file")
+# --- NEW: CONFIGURE HUGGING FACE API CLIENT ---
+HF_TOKEN = os.getenv('HF_TOKEN')
+if not HF_TOKEN:
+    raise ValueError("HF_TOKEN (Hugging Face Token) not found in .env file")
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
+# Using a powerful and reliable open-source model
+API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
 
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (DeepSeek Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Hugging Face Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -43,7 +44,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: ESSENTIA ANALYSIS (UNCHANGED AND STABLE) ---
+        # --- STAGE 1: ESSENTIA ANALYSIS (STABLE & RELIABLE) ---
         print("Running Essentia analysis...")
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
@@ -62,18 +63,17 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: DEEPSEEK ANALYSIS (THE NEW ENGINE) ---
-        print("Contacting DeepSeek for expert analysis...")
+        # --- STAGE 2: HUGGING FACE ANALYSIS (THE NEW ENGINE) ---
+        print("Contacting Hugging Face for expert analysis...")
         
         headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+            "Authorization": f"Bearer {HF_TOKEN}"
         }
 
         prompt = f"""
-        You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
+        [INST] You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
 
-        Based ONLY on this technical data, provide a detailed assessment in a valid JSON format.
+        Based ONLY on this technical data, provide a detailed assessment.
         
         Your analysis must cover these four categories:
         1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
@@ -83,31 +83,33 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
-        Your final output MUST be a single, valid JSON object with no extra text or markdown formatting.
+        Your final output MUST be a single, valid JSON object with no extra text or markdown formatting. [/INST]
         """
 
         payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                {"role": "system", "content": "You are a helpful assistant that only responds with valid JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            "response_format": {"type": "json_object"}
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 512,
+                "temperature": 0.7,
+            }
         }
 
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
-        response.raise_for_status()  # This will raise an exception for HTTP error codes
+        response = requests.post(API_URL, headers=headers, json=payload)
+        response.raise_for_status()
 
-        print("DeepSeek Analysis Complete.")
-        analysis_result = response.json()['choices'][0]['message']['content']
+        print("Hugging Face Analysis Complete.")
+        # The response is a list, we take the first item's generated text
+        generated_text = response.json()[0]['generated_text']
         
-        # The content from DeepSeek is a JSON string, so we need to parse it
-        return json.loads(analysis_result)
+        # The model's response includes the original prompt, so we strip it out
+        json_response_string = generated_text.split("[/INST]")[-1].strip()
+        
+        return json.loads(json_response_string)
 
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err}")
         print(f"Response body: {response.text}")
-        raise HTTPException(status_code=response.status_code, detail=f"Error from DeepSeek API: {response.text}")
+        raise HTTPException(status_code=response.status_code, detail=f"Error from Hugging Face API: {response.text}")
     except Exception as e:
         print(f"An error occurred: {e}")
         traceback.print_exc()
