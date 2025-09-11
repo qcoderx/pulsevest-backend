@@ -4,7 +4,7 @@ import traceback
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from openai import OpenAI # The correct, official client
+from openai import OpenAI
 import essentia.standard as es
 import uvicorn
 
@@ -24,7 +24,6 @@ app.add_middleware(
 )
 
 # --- THE FINAL, DEFINITIVE, AND WORKING HUGGING FACE CONFIGURATION ---
-# Using the OpenAI client pointed at the HF Router, as you commanded
 client = OpenAI(
     base_url="https://router.huggingface.co/v1",
     api_key=os.environ["HF_TOKEN"],
@@ -33,7 +32,7 @@ client = OpenAI(
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Llama 3 OpenAI SDK Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (DeepSeek V3.1 Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -63,7 +62,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         print(f"Essentia Analysis Complete: {essentia_data}")
 
         # --- STAGE 2: HUGGING FACE ANALYSIS (YOUR CORRECT LOGIC) ---
-        print("Contacting Llama 3 via HF Router for expert analysis...")
+        print("Contacting DeepSeek via HF Router for expert analysis...")
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. Your task is to analyze technical data from an audio track and return a single, valid JSON object. Do not include any text, notes, or markdown formatting before or after the JSON object. Your entire response must be only the JSON object itself.
@@ -80,13 +79,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         """
         
         completion = client.chat.completions.create(
-            model="meta-llama/Llama-3.1-8B-Instruct:cerebras", 
+            # --- USING THE EXACT MODEL YOU COMMANDED ---
+            model="deepseek-ai/DeepSeek-V3.1:together", 
             messages=[
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
             max_tokens=1024,
-            # --- THIS IS THE DEFINITIVE FIX: FORCING A JSON RESPONSE ---
+            # Forcing a JSON response
             response_format={"type": "json_object"},
         )
 
@@ -97,7 +97,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         if not message_content:
              raise ValueError("Received an empty response from the AI model.")
 
-        # The response is now guaranteed to be a JSON string, so no extra cleaning is needed
+        # The response is now guaranteed to be a JSON string.
         return json.loads(message_content)
 
     except Exception as e:
