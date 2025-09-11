@@ -81,7 +81,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         completion = client.chat.completions.create(
             # --- THIS IS THE DEFINITIVE FIX: USING THE CORRECT, SUPPORTED MODEL NAME ---
-            model="meta-llama/Llama-3.1-8B-Instruct:cerebras", 
+            model="deepseek-ai/DeepSeek-V3-0324", 
             messages=[
                 {"role": "user", "content": prompt}
             ],
