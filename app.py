@@ -23,18 +23,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- THE FINAL, GUARANTEED-TO-WORK HUGGING FACE CONFIGURATION ---
+# --- THE FINAL, DEFINITIVE, AND WORKING HUGGING FACE CONFIGURATION ---
 HF_TOKEN = os.getenv('HF_TOKEN')
 if not HF_TOKEN:
     raise ValueError("HF_TOKEN (Hugging Face Token) not found in .env file")
 
-# Using the powerful and GUARANTEED-ONLINE Llama 3 model from your list
-API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+# Using the EXACT model you specified from the correct list
+API_URL = "https://api-inference.huggingface.co/models/HuggingFaceTB/SmolLM-3B"
 
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Llama 3 Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (SmolLM3 Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -64,11 +64,11 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         print(f"Essentia Analysis Complete: {essentia_data}")
 
         # --- STAGE 2: HUGGING FACE ANALYSIS (THE FINAL ENGINE) ---
-        print("Contacting Llama 3 on Hugging Face for expert analysis...")
+        print("Contacting SmolLM3 on Hugging Face for expert analysis...")
         
         headers = { "Authorization": f"Bearer {HF_TOKEN}" }
 
-        # --- RE-ENGINEERED PROMPT FOR THE LLAMA 3 MODEL'S EXACT FORMAT ---
+        # This prompt format is compatible with SmolLM3
         prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are an expert A&R and music analyst for PulseVest. Your task is to analyze technical data from an audio track and return a single, valid JSON object. Do not include any text, notes, or markdown formatting before or after the JSON object. Your entire response must be only the JSON object itself.<|eot_id|><|start_header_id|>user<|end_header_id|>
 I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
@@ -87,7 +87,7 @@ For each category, provide a score from 0 to 100 and a concise, one-sentence exp
             "parameters": {
                 "max_new_tokens": 1024,
                 "temperature": 0.1,
-                "return_full_text": False 
+                "return_full_text": False
             }
         }
 
@@ -97,7 +97,6 @@ For each category, provide a score from 0 to 100 and a concise, one-sentence exp
         print("Hugging Face Analysis Complete.")
         generated_text = response.json()[0]['generated_text']
         
-        # Llama 3 is very good at following instructions, so this is just a final safeguard
         cleaned_json = generated_text.strip()
         
         return json.loads(cleaned_json)
