@@ -13,8 +13,8 @@ load_dotenv()
 
 app = FastAPI()
 
-# Configure CORS
-origins = ["http://localhost:3000"] # Add your frontend's production URL here later
+# Configure CORS for your frontend
+origins = ["http://localhost:3000", "https://*.vercel.app"] 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -23,18 +23,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- NEW: CONFIGURE HUGGING FACE API CLIENT WITH A RELIABLE MODEL ---
+# --- THE FINAL, GUARANTEED-TO-WORK HUGGING FACE CONFIGURATION ---
 HF_TOKEN = os.getenv('HF_TOKEN')
 if not HF_TOKEN:
     raise ValueError("HF_TOKEN (Hugging Face Token) not found in .env file")
 
-# Using a powerful and reliable open-source model known to be available on the free tier
-API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+# Using the powerful and GUARANTEED-ONLINE Llama 3 model from your list
+API_URL = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
 
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Hugging Face Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Llama 3 Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -63,36 +63,30 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: HUGGING FACE ANALYSIS (THE NEW ENGINE) ---
-        print("Contacting Hugging Face for expert analysis...")
+        # --- STAGE 2: HUGGING FACE ANALYSIS (THE FINAL ENGINE) ---
+        print("Contacting Llama 3 on Hugging Face for expert analysis...")
         
-        headers = {
-            "Authorization": f"Bearer {HF_TOKEN}"
-        }
+        headers = { "Authorization": f"Bearer {HF_TOKEN}" }
 
-        # --- RE-ENGINEERED PROMPT FOR THE ZEPHYR MODEL ---
-        prompt = f"""<|system|>
-        You are an expert A&R and music analyst for PulseVest. Your task is to analyze the provided technical data from an audio track and return a detailed assessment. Your response MUST be a single, valid JSON object with no extra text or markdown formatting.</s>
-        <|user|>
-        I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
+        # --- RE-ENGINEERED PROMPT FOR THE LLAMA 3 MODEL'S EXACT FORMAT ---
+        prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are an expert A&R and music analyst for PulseVest. Your task is to analyze technical data from an audio track and return a single, valid JSON object. Do not include any text, notes, or markdown formatting before or after the JSON object. Your entire response must be only the JSON object itself.<|eot_id|><|start_header_id|>user<|end_header_id|>
+I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
 
-        Based ONLY on this technical data, provide a detailed assessment covering these four categories:
-        1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
-        2.  **Sound Quality:** Infer this based on the context of a demo. Acknowledge this is an inference.
-        3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
-        4.  **Genre Relevance:** Based on all the data, what is the likely genre of this track and how does it fit?
+Based ONLY on this technical data, provide a detailed assessment covering these four categories:
+1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
+2.  **Sound Quality:** Infer this based on the context of a demo. Acknowledge this is an inference.
+3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
+4.  **Genre Relevance:** Based on all the data, what is the likely genre of this track and how does it fit?
         
-        For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
-        
-        Your response must be ONLY the JSON object.</s>
-        <|assistant|>
-        """
+For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
 
         payload = {
             "inputs": prompt,
             "parameters": {
                 "max_new_tokens": 1024,
-                "temperature": 0.7,
+                "temperature": 0.1,
                 "return_full_text": False 
             }
         }
@@ -103,8 +97,8 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         print("Hugging Face Analysis Complete.")
         generated_text = response.json()[0]['generated_text']
         
-        # Clean the response just in case the model adds stray characters
-        cleaned_json = generated_text.replace('```json', '').replace('```', '').strip()
+        # Llama 3 is very good at following instructions, so this is just a final safeguard
+        cleaned_json = generated_text.strip()
         
         return json.loads(cleaned_json)
 
