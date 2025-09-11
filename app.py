@@ -1,6 +1,7 @@
 import os
 import json
 import traceback
+import time
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -61,7 +62,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: HUGGING FACE ANALYSIS (YOUR CORRECT LOGIC) ---
+        # --- STAGE 2: HUGGING FACE ANALYSIS (THE FINAL, UNBREAKABLE LOGIC) ---
         print("Contacting DeepSeek via HF Router for expert analysis...")
         
         prompt = f"""
@@ -78,30 +79,54 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         """
         
-        completion = client.chat.completions.create(
-            # --- USING THE EXACT MODEL YOU COMMANDED ---
-            model="deepseek-ai/DeepSeek-V3.1:together", 
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1,
-            max_tokens=1024,
-            # Forcing a JSON response
-            response_format={"type": "json_object"},
-        )
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                completion = client.chat.completions.create(
+                    model="deepseek-ai/DeepSeek-V3.1:together", 
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=1024,
+                    response_format={"type": "json_object"},
+                )
 
-        print("Hugging Face Analysis Complete.")
-        
-        message_content = completion.choices[0].message.content
-        
-        if not message_content:
-             raise ValueError("Received an empty response from the AI model.")
+                print(f"Hugging Face Analysis Attempt {attempt + 1} Complete.")
+                
+                message_content = completion.choices[0].message.content
+                
+                if not message_content:
+                    raise ValueError("Received an empty response from the AI model.")
 
-        # The response is now guaranteed to be a JSON string.
-        return json.loads(message_content)
+                print("Raw response from AI:", message_content)
+                
+                # --- THE BRUTE-FORCE, UNBREAKABLE PARSER ---
+                start_index = message_content.find('{')
+                end_index = message_content.rfind('}') + 1
+                
+                if start_index == -1 or end_index == 0:
+                    raise ValueError("Could not find a valid JSON object in the AI's response.")
+                    
+                json_string = message_content[start_index:end_index]
+                
+                print("Extracted JSON string:", json_string)
+                
+                # If parsing is successful, we return the result and exit the loop
+                return json.loads(json_string)
+
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Attempt {attempt + 1} failed with a parsing error: {e}")
+                if attempt < max_retries - 1:
+                    print("Retrying...")
+                    time.sleep(1) # Wait a second before retrying
+                else:
+                    # If all retries fail, we raise the final exception
+                    raise HTTPException(status_code=500, detail="The AI model returned a malformed response after multiple attempts.")
+        
+        # This line should not be reachable, but is a fallback
+        raise HTTPException(status_code=500, detail="Failed to get a valid response from the AI model.")
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"A critical error occurred: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
