@@ -1,5 +1,8 @@
 fastapi
-uvicorn
 python-dotenv
-requests
+google-generativeai
 essentia
+uvicorn
+gunicorn
+python-multipart
+requests
