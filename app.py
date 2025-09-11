@@ -80,7 +80,8 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         """
         
         completion = client.chat.completions.create(
-            model="meta-llama/Llama-3.1-8B-Instruct", # Using the stable Llama 3.1 model
+            # --- THIS IS THE DEFINITIVE FIX: USING THE CORRECT, SUPPORTED MODEL NAME ---
+            model="meta-llama/Llama-3.1-8B-Instruct:cerebras", 
             messages=[
                 {"role": "user", "content": prompt}
             ],
