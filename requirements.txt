@@ -6,3 +6,4 @@ uvicorn
 gunicorn
 python-multipart
 requests
+openai
