@@ -4,7 +4,7 @@ import traceback
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import requests
+from openai import OpenAI # The correct, official client
 import essentia.standard as es
 import uvicorn
 
@@ -13,8 +13,8 @@ load_dotenv()
 
 app = FastAPI()
 
-# Configure CORS for your frontend
-origins = ["http://localhost:3000", "https://*.vercel.app"] 
+# Configure CORS
+origins = ["http://localhost:3000", "https://*.vercel.app"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -24,17 +24,16 @@ app.add_middleware(
 )
 
 # --- THE FINAL, DEFINITIVE, AND WORKING HUGGING FACE CONFIGURATION ---
-HF_TOKEN = os.getenv('HF_TOKEN')
-if not HF_TOKEN:
-    raise ValueError("HF_TOKEN (Hugging Face Token) not found in .env file")
-
-# Using the EXACT model you specified from the correct list
-API_URL = "https://api-inference.huggingface.co/models/HuggingFaceTB/SmolLM-3B"
+# Using the OpenAI client pointed at the HF Router, as you commanded
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=os.environ["HF_TOKEN"],
+)
 
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (SmolLM3 Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Llama 3 OpenAI SDK Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -63,48 +62,44 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: HUGGING FACE ANALYSIS (THE FINAL ENGINE) ---
-        print("Contacting SmolLM3 on Hugging Face for expert analysis...")
+        # --- STAGE 2: HUGGING FACE ANALYSIS (YOUR CORRECT LOGIC) ---
+        print("Contacting Llama 3 via HF Router for expert analysis...")
         
-        headers = { "Authorization": f"Bearer {HF_TOKEN}" }
+        prompt = f"""
+        You are an expert A&R and music analyst for PulseVest. Your task is to analyze technical data from an audio track and return a single, valid JSON object. Do not include any text, notes, or markdown formatting before or after the JSON object. Your entire response must be only the JSON object itself.
 
-        # This prompt format is compatible with SmolLM3
-        prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are an expert A&R and music analyst for PulseVest. Your task is to analyze technical data from an audio track and return a single, valid JSON object. Do not include any text, notes, or markdown formatting before or after the JSON object. Your entire response must be only the JSON object itself.<|eot_id|><|start_header_id|>user<|end_header_id|>
-I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
+        Here is the technical data extracted using the Essentia library: {json.dumps(essentia_data)}.
 
-Based ONLY on this technical data, provide a detailed assessment covering these four categories:
-1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
-2.  **Sound Quality:** Infer this based on the context of a demo. Acknowledge this is an inference.
-3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
-4.  **Genre Relevance:** Based on all the data, what is the likely genre of this track and how does it fit?
+        Based ONLY on this technical data, provide a detailed assessment covering these four categories:
+        1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
+        2.  **Sound Quality:** Infer this based on the context of a demo. Acknowledge this is an inference.
+        3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
+        4.  **Genre Relevance:** Based on all the data, what is the likely genre of this track and how does it fit?
         
-For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-"""
-
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 1024,
-                "temperature": 0.1,
-                "return_full_text": False
-            }
-        }
-
-        response = requests.post(API_URL, headers=headers, json=payload)
-        response.raise_for_status()
+        For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
+        """
+        
+        completion = client.chat.completions.create(
+            model="meta-llama/Llama-3.1-8B-Instruct", # Using the stable Llama 3.1 model
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=1024,
+        )
 
         print("Hugging Face Analysis Complete.")
-        generated_text = response.json()[0]['generated_text']
         
-        cleaned_json = generated_text.strip()
+        message_content = completion.choices[0].message.content
+        
+        if not message_content:
+             raise ValueError("Received an empty response from the AI model.")
+
+        # Clean the response to ensure it's valid JSON
+        cleaned_json = message_content.replace('```json', '').replace('```', '').strip()
         
         return json.loads(cleaned_json)
 
-    except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err}")
-        print(f"Response body: {response.text}")
-        raise HTTPException(status_code=response.status_code, detail=f"Error from Hugging Face API: {response.text}")
     except Exception as e:
         print(f"An error occurred: {e}")
         traceback.print_exc()
