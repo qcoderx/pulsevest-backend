@@ -46,7 +46,6 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         # --- STAGE 1: DEFINITIVE, UNBREAKABLE A LA CARTE ESSENTIA ANALYSIS ---
         print("--- STAGE 1: DEFINITIVE ADVANCED ESSENTIA ANALYSIS ---")
         
-        # Using MonoLoader is correct and robust for these algorithms
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
@@ -64,8 +63,10 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         dynamic_complexity_algo = es.DynamicComplexity()
         dynamic_complexity, _ = dynamic_complexity_algo(audio)
         
+        # --- THE DEFINITIVE FIX: CORRECTING THE TYPO ---
         spectral_contrast_algo = es.SpectralContrast()
-        spec_contrast, _, _, _ = spec_contrast_algo(audio)
+        # The variable name below now correctly matches the line above it.
+        spec_contrast, _, _, _ = spectral_contrast_algo(audio)
         avg_spectral_contrast = np.mean(spec_contrast)
 
         spectral_flatness_algo = es.Flatness()
@@ -84,7 +85,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         # --- STAGE 2: UPGRADED GEMINI ANALYSIS ---
         print("\n--- STAGE 2: UPGRADED GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following rich, objective data using the Essentia library: {json.dumps(essentia_data)}.
