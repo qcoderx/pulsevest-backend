@@ -13,7 +13,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# Configure CORS for your frontend
+# Configure CORS
 origins = ["http://localhost:3000", "https://*.vercel.app"] 
 app.add_middleware(
     CORSMiddleware,
@@ -43,7 +43,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
 
     try:
         # --- STAGE 1: ESSENTIA ANALYSIS (STABLE & RELIABLE) ---
-        print("Running Essentia analysis...")
+        print("--- STAGE 1: ESSENTIA ANALYSIS ---")
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
@@ -62,9 +62,9 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         print(f"Essentia Analysis Complete: {essentia_data}")
 
         # --- STAGE 2: GEMINI ANALYSIS (THE FINAL ENGINE) ---
-        print("Contacting Gemini 1.5 Flash for expert analysis...")
+        print("\n--- STAGE 2: GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
@@ -81,18 +81,28 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         Your final output MUST be a single, valid JSON object with no extra text or markdown formatting.
         """
-
+        
+        print("Contacting Gemini 1.5 Flash...")
         response = model.generate_content(prompt)
-        # Clean the response to ensure it's valid JSON
+        
+        # --- THIS IS THE BLACK BOX RECORDER ---
+        # We print the raw, unfiltered response directly to the logs.
+        print("\n--- BLACK BOX RECORDER ---")
+        print("RAW, UNFILTERED RESPONSE FROM GEMINI:")
+        print(response.text)
+        print("--- END OF RAW RESPONSE ---\n")
+        
+        # We continue with the parsing logic as a final guarantee
         cleaned_json = response.text.replace('```json', '').replace('```', '').strip()
         
-        print("Gemini Analysis Complete.")
+        print("Attempting to parse cleaned JSON...")
         analysis_result = json.loads(cleaned_json)
+        print("JSON parsing successful.")
 
         return analysis_result
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"A CRITICAL ERROR OCCURRED: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
