@@ -7,3 +7,4 @@ gunicorn
 python-multipart
 requests
 openai
+numpy

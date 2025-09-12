@@ -33,7 +33,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Final Advanced Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Final Unbreakable Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -43,68 +43,48 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: DEFINITIVE, CORRECTED A LA CARTE ESSENTIA ANALYSIS ---
+        # --- STAGE 1: DEFINITIVE, UNBREAKABLE A LA CARTE ESSENTIA ANALYSIS ---
         print("--- STAGE 1: DEFINITIVE ADVANCED ESSENTIA ANALYSIS ---")
         
-        # CRITICAL FIX: Load as STEREO audio for algorithms that require it
-        loader = es.AudioLoader(filename=temp_filename)
-        audio, sample_rate, _, _, _, _ = loader()
+        # Using MonoLoader is correct and robust for these algorithms
+        loader = es.MonoLoader(filename=temp_filename)
+        audio = loader()
         
-        # Convert stereo to mono for algorithms that need mono
-        if audio.shape[0] == 2:  # If stereo
-            mono_audio = es.StereoToMono()(audio)
-        else:
-            mono_audio = audio.mean(axis=0) if len(audio.shape) > 1 else audio
+        print("Extracting advanced features a la carte to guarantee compatibility...")
         
-        print("Extracting advanced features a la carte to avoid errors...")
-        
-        # --- RHYTHM & KEY (using mono) ---
+        # --- RHYTHM & KEY (ALL MONO-COMPATIBLE) ---
         rhythm_extractor = es.RhythmExtractor2013()
-        bpm, _, _, _, _ = rhythm_extractor(mono_audio)
-        
+        bpm, _, _, _, _ = rhythm_extractor(audio)
         danceability_algo = es.Danceability()
-        danceability_result, _ = danceability_algo(mono_audio)
-        
+        danceability_result, _ = danceability_algo(audio)
         key_extractor = es.KeyExtractor()
-        key, scale, strength = key_extractor(mono_audio)
+        key, scale, strength = key_extractor(audio)
 
-        # --- ADVANCED SOUND QUALITY METRICS (using mono) ---
+        # --- ADVANCED SOUND QUALITY METRICS (ALL MONO-COMPATIBLE) ---
         dynamic_complexity_algo = es.DynamicComplexity()
-        dynamic_complexity, _ = dynamic_complexity_algo(mono_audio)
+        dynamic_complexity, _ = dynamic_complexity_algo(audio)
         
-        # FIX: LoudnessEBUR128 expects stereo input
-        # If we have mono, duplicate it to create pseudo-stereo
-        if len(audio.shape) == 1 or audio.shape[0] == 1:
-            stereo_audio = np.array([mono_audio, mono_audio])
-        else:
-            stereo_audio = audio
-        
-        loudness_algo = es.LoudnessEBUR128()
-        _, loudness_range, _, _ = loudness_algo(stereo_audio)
+        spectral_contrast_algo = es.SpectralContrast()
+        spec_contrast, _, _, _ = spec_contrast_algo(audio)
+        avg_spectral_contrast = np.mean(spec_contrast)
 
-        # --- SPECTRAL ANALYSIS (using mono) ---
-        # Using SpectralCentroidTime instead of SpectralContrast to avoid issues
-        spectral_centroid = es.SpectralCentroidTime()(mono_audio)
-        
-        # Alternative: Calculate spectral complexity
-        spectrum = es.Spectrum()(mono_audio)
-        spectral_complexity = es.SpectralComplexity()(spectrum)
+        spectral_flatness_algo = es.Flatness()
+        spectral_flatness = np.mean(spectral_flatness_algo(audio))
 
         essentia_data = {
             "bpm": f"{bpm:.1f}",
             "danceability": f"{danceability_result:.2f}",
             "key": f"{key} {scale}",
             "dynamic_complexity": f"{dynamic_complexity:.2f}",
-            "loudness_range_db": f"{loudness_range:.2f}",
-            "spectral_complexity": f"{spectral_complexity:.2f}",
-            "spectral_centroid": f"{spectral_centroid:.2f}"
+            "spectral_contrast": f"{avg_spectral_contrast:.2f}",
+            "spectral_flatness": f"{spectral_flatness:.4f}"
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
         # --- STAGE 2: UPGRADED GEMINI ANALYSIS ---
         print("\n--- STAGE 2: UPGRADED GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following rich, objective data using the Essentia library: {json.dumps(essentia_data)}.
@@ -113,9 +93,9 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         Your analysis must cover these four categories:
         1.  **Rhythm Quality:** Based on the BPM ({essentia_data['bpm']}) and Danceability score ({essentia_data['danceability']}), infer the energy and potential catchiness.
-        2.  **Sound Quality:** Based on Dynamic Complexity ({essentia_data['dynamic_complexity']}) and Loudness Range ({essentia_data['loudness_range_db']} dB), assess the production quality. A higher dynamic complexity and a balanced loudness range suggest a professional mix.
+        2.  **Sound Quality:** Based on Dynamic Complexity ({essentia_data['dynamic_complexity']}) and Spectral Flatness ({essentia_data['spectral_flatness']}), assess the production quality. A higher dynamic complexity suggests a professional mix, while a lower spectral flatness indicates a more tonal, less noisy sound.
         3.  **Market Potential:** Based on the danceability and key ({essentia_data['key']}), how well could this track perform in the current Afrobeats/African music market?
-        4.  **Genre Relevance:** Based on all the data, especially the Spectral Complexity ({essentia_data['spectral_complexity']}) and Spectral Centroid ({essentia_data['spectral_centroid']}), use your expertise to infer the track's most likely genre and assess its sonic texture and fit. Higher values often indicate a richer, more defined sound.
+        4.  **Genre Relevance:** Based on all the data, especially the Spectral Contrast ({essentia_data['spectral_contrast']}), use your expertise to infer the track's most likely genre and assess its sonic texture and fit.
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
@@ -171,3 +151,4 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
+
