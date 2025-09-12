@@ -43,7 +43,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: DEFINITIVE A LA CARTE ESSENTIA ANALYSIS ---
+        # --- STAGE 1: DEFINITIVE, CORRECTED A LA CARTE ESSENTIA ANALYSIS ---
         print("--- STAGE 1: DEFINITIVE ADVANCED ESSENTIA ANALYSIS ---")
         
         loader = es.MonoLoader(filename=temp_filename)
@@ -62,12 +62,15 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         # --- ADVANCED SOUND QUALITY METRICS ---
         dynamic_complexity_algo = es.DynamicComplexity()
         dynamic_complexity, _ = dynamic_complexity_algo(audio)
-        zcr_algo = es.ZeroCrossingRate()
-        zcr = np.mean(zcr_algo(audio))
-        tonalness_algo = es.Tonalness()
-        tonalness, _ = tonalness_algo(audio)
+        
         loudness_algo = es.LoudnessEBUR128()
         _, loudness_range, _, _ = loudness_algo(audio)
+
+        # --- THE DEFINITIVE FIX: REPLACING THE FAILED ALGORITHM ---
+        # We now use SpectralContrast, a real and powerful tool for analyzing sonic texture.
+        spec_contrast_algo = es.SpectralContrast()
+        spec_contrast, _, _, _ = spec_contrast_algo(audio)
+        avg_spectral_contrast = np.mean(spec_contrast)
 
         essentia_data = {
             "bpm": f"{bpm:.1f}",
@@ -75,15 +78,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
             "key": f"{key} {scale}",
             "dynamic_complexity": f"{dynamic_complexity:.2f}",
             "loudness_range_db": f"{loudness_range:.2f}",
-            "zero_crossing_rate": f"{zcr:.4f}",
-            "tonalness": f"{tonalness:.2f}"
+            "spectral_contrast": f"{avg_spectral_contrast:.2f}"
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
         # --- STAGE 2: UPGRADED GEMINI ANALYSIS ---
         print("\n--- STAGE 2: UPGRADED GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following rich, objective data using the Essentia library: {json.dumps(essentia_data)}.
@@ -92,9 +94,9 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         Your analysis must cover these four categories:
         1.  **Rhythm Quality:** Based on the BPM ({essentia_data['bpm']}) and Danceability score ({essentia_data['danceability']}), infer the energy and potential catchiness.
-        2.  **Sound Quality:** Based on Dynamic Complexity ({essentia_data['dynamic_complexity']}), Loudness Range ({essentia_data['loudness_range_db']} dB), and Zero Crossing Rate ({essentia_data['zero_crossing_rate']}), assess the production quality. A higher dynamic complexity and a balanced loudness range suggest a professional mix. A lower ZCR suggests more tonal, less noisy content.
-        3.  **Market Potential:** Based on the danceability, key ({essentia_data['key']}), and tonalness ({essentia_data['tonalness']}), how well could this track perform in the current Afrobeats/African music market? High tonalness and danceability are strong positive indicators.
-        4.  **Genre Relevance:** Based on all the data, use your expertise to infer the track's most likely genre and assess how well it fits and innovates within that genre.
+        2.  **Sound Quality:** Based on Dynamic Complexity ({essentia_data['dynamic_complexity']}) and Loudness Range ({essentia_data['loudness_range_db']} dB), assess the production quality. A higher dynamic complexity and a balanced loudness range suggest a professional mix.
+        3.  **Market Potential:** Based on the danceability and key ({essentia_data['key']}), how well could this track perform in the current Afrobeats/African music market?
+        4.  **Genre Relevance:** Based on all the data, especially the Spectral Contrast ({essentia_data['spectral_contrast']}), use your expertise to infer the track's most likely genre and assess its sonic texture and fit. A higher spectral contrast often indicates a richer, more defined sound.
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
