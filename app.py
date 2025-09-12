@@ -85,21 +85,39 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         print("Contacting Gemini 1.5 Flash...")
         response = model.generate_content(prompt)
         
-        # --- THIS IS THE BLACK BOX RECORDER ---
-        # We print the raw, unfiltered response directly to the logs.
         print("\n--- BLACK BOX RECORDER ---")
         print("RAW, UNFILTERED RESPONSE FROM GEMINI:")
         print(response.text)
         print("--- END OF RAW RESPONSE ---\n")
         
-        # We continue with the parsing logic as a final guarantee
         cleaned_json = response.text.replace('```json', '').replace('```', '').strip()
         
         print("Attempting to parse cleaned JSON...")
-        analysis_result = json.loads(cleaned_json)
+        gemini_result = json.loads(cleaned_json)
         print("JSON parsing successful.")
 
-        return analysis_result
+        # --- THIS IS THE FINAL, DEFINITIVE TRANSLATOR ---
+        print("\n--- STAGE 3: TRANSLATING BLUEPRINT FOR FRONTEND ---")
+        
+        scores_for_frontend = []
+        # We iterate through the AI's response to build the correct format
+        for key, value in gemini_result.items():
+            if isinstance(value, dict) and 'score' in value and 'explanation' in value:
+                scores_for_frontend.append({
+                    "category": key,
+                    "score": value["score"],
+                    "explanation": value["explanation"]
+                })
+
+        # We construct the final, perfect object for the frontend
+        final_response_for_frontend = {
+            "pulseScore": gemini_result.get("Pulse Score"),
+            "suggestions": gemini_result.get("Suggestions"),
+            "scores": scores_for_frontend
+        }
+        
+        print("Translation complete. Sending perfect data to frontend.")
+        return final_response_for_frontend
 
     except Exception as e:
         print(f"A CRITICAL ERROR OCCURRED: {e}")
