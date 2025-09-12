@@ -111,7 +111,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         1.  **Rhythm Quality:** Based on the BPM ({essentia_data['bpm']}) and Danceability score ({essentia_data['danceability']}), infer the energy and potential catchiness. know that the danceability is between 0-3
         2.  **Sound Quality:** Based on Dynamic Complexity ({essentia_data['dynamic_complexity']}) and Spectral Flatness ({essentia_data['spectral_flatness']}), assess the production quality. A higher dynamic complexity suggests a professional mix, while a lower spectral flatness indicates a more tonal, less noisy sound.
         3.  **Market Potential:** Based on the danceability and key ({essentia_data['key']}), how well could this track perform in the current Afrobeats/African music market?
-        4.  **Genre Relevance:** Based on all the data, especially the Spectral Contrast ({essentia_data['spectral_contrast']}), use your expertise to infer the track's most likely genre and assess its sonic texture and fit.
+        4.  **Genre Relevance:** Based on all the data, especially the Spectral Contrast ({essentia_data['spectral_contrast']}), use your expertise to infer the track's most likely genre and assess its sonic texture and fit. If the Spectral contrast is negative, just remove the minus and make it positive
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
