@@ -45,31 +45,22 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         # --- STAGE 1: ADVANCED ESSENTIA ANALYSIS ---
         print("--- STAGE 1: ADVANCED ESSENTIA ANALYSIS ---")
         
-        # Load the audio file
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
-        # --- NEW: Run the full MusicExtractor to get genre and much more ---
-        # Note: This requires genre models to be available. We'll handle errors gracefully.
         print("Running Music Extractor...")
         extractor = es.MusicExtractor()
         features, features_frames = extractor(audio)
         
-        # Safely extract genre from the results
-        genre_results = features['tonal.chords_key'] # A proxy for genre classification
-        genre = genre_results
-
-        # Safely extract advanced sound quality metrics
-        dynamic_complexity = features.get('lowlevel.dynamic_complexity', 'N/A')
-        loudness_range = features.get('lowlevel.loudness_ebu128.loudness_range', 'N/A')
-        
+        # --- THIS IS THE DEFINITIVE FIX ---
+        # We now correctly extract all data into JSON-serializable formats (string or float)
+        # and remove the complex VECTOR_REAL that was causing the crash.
         essentia_data = {
             "bpm": f"{features['rhythm.bpm']:.1f}",
-            "danceability": features['rhythm.danceability'],
+            "danceability": f"{features['rhythm.danceability']:.2f}",
             "key": f"{features['tonal.key_key']} {features['tonal.key_scale']}",
-            "genre_essentia": genre,
-            "dynamic_complexity": f"{dynamic_complexity:.2f}" if isinstance(dynamic_complexity, float) else "N/A",
-            "loudness_range_db": f"{loudness_range:.2f}" if isinstance(loudness_range, float) else "N/A",
+            "dynamic_complexity": f"{features.get('lowlevel.dynamic_complexity', 0.0):.2f}",
+            "loudness_range_db": f"{features.get('lowlevel.loudness_ebu128.loudness_range', 0.0):.2f}",
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
@@ -87,7 +78,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         1.  **Rhythm Quality:** Based on the BPM and Danceability score, infer the energy and potential catchiness.
         2.  **Sound Quality:** Based on the Dynamic Complexity and Loudness Range, assess the production quality. A higher dynamic complexity and a balanced loudness range are signs of a professional mix.
         3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
-        4.  **Genre Relevance:** Essentia classified this track's primary genre characteristics as '{genre}'. Based on all the data, how well does this track fit and innovate within this genre?
+        4.  **Genre Relevance:** Based on all the data, use your expertise to infer the track's most likely genre and assess how well it fits and innovates within that genre.
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
