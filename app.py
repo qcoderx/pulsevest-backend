@@ -63,32 +63,28 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         frameSize = 2048
         hopSize = 1024
         
-        # Initialize the algorithms we will run on each frame
         spectrum_algo = es.Spectrum()
         spectral_contrast_algo = es.SpectralContrast()
         flatness_algo = es.Flatness()
         dynamic_complexity_algo = es.DynamicComplexity()
 
-        # Lists to store the results from each frame
         spec_contrast_results = []
         flatness_results = []
         
-        # The main assembly line loop
         for frame in es.FrameGenerator(audio, frameSize=frameSize, hopSize=hopSize, startFromZero=True):
             spectrum = spectrum_algo(frame)
             
-            # These algorithms require the spectrum as input
-            spec_contrast_frame, _, _, _ = spectral_contrast_algo(spectrum)
+            # --- THIS IS THE DEFINITIVE FIX ---
+            # SpectralContrast returns TWO values. We now correctly unpack TWO values.
+            spec_contrast_frame, _ = spectral_contrast_algo(spectrum)
             flatness_frame = flatness_algo(spectrum)
             
             spec_contrast_results.append(spec_contrast_frame)
             flatness_results.append(flatness_frame)
 
-        # Calculate the average of the results from all frames
         avg_spectral_contrast = np.mean(spec_contrast_results)
         avg_flatness = np.mean(flatness_results)
 
-        # Dynamic complexity runs on the whole audio vector
         dynamic_complexity, _ = dynamic_complexity_algo(audio)
 
         essentia_data = {
