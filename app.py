@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import essentia.standard as es
 import uvicorn
+import numpy as np
 
 # --- SETUP ---
 load_dotenv()
@@ -32,7 +33,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Advanced Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Final Advanced Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -42,25 +43,40 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: ADVANCED ESSENTIA ANALYSIS ---
-        print("--- STAGE 1: ADVANCED ESSENTIA ANALYSIS ---")
+        # --- STAGE 1: DEFINITIVE A LA CARTE ESSENTIA ANALYSIS ---
+        print("--- STAGE 1: DEFINITIVE ADVANCED ESSENTIA ANALYSIS ---")
         
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
-        print("Running Music Extractor...")
-        extractor = es.MusicExtractor()
-        features, features_frames = extractor(audio)
+        print("Extracting advanced features a la carte to avoid errors...")
         
-        # --- THIS IS THE DEFINITIVE FIX ---
-        # We now correctly extract all data into JSON-serializable formats (string or float)
-        # and remove the complex VECTOR_REAL that was causing the crash.
+        # --- RHYTHM & KEY ---
+        rhythm_extractor = es.RhythmExtractor2013()
+        bpm, _, _, _, _ = rhythm_extractor(audio)
+        danceability_algo = es.Danceability()
+        danceability_result, _ = danceability_algo(audio)
+        key_extractor = es.KeyExtractor()
+        key, scale, strength = key_extractor(audio)
+
+        # --- ADVANCED SOUND QUALITY METRICS ---
+        dynamic_complexity_algo = es.DynamicComplexity()
+        dynamic_complexity, _ = dynamic_complexity_algo(audio)
+        zcr_algo = es.ZeroCrossingRate()
+        zcr = np.mean(zcr_algo(audio))
+        tonalness_algo = es.Tonalness()
+        tonalness, _ = tonalness_algo(audio)
+        loudness_algo = es.LoudnessEBUR128()
+        _, loudness_range, _, _ = loudness_algo(audio)
+
         essentia_data = {
-            "bpm": f"{features['rhythm.bpm']:.1f}",
-            "danceability": f"{features['rhythm.danceability']:.2f}",
-            "key": f"{features['tonal.key_key']} {features['tonal.key_scale']}",
-            "dynamic_complexity": f"{features.get('lowlevel.dynamic_complexity', 0.0):.2f}",
-            "loudness_range_db": f"{features.get('lowlevel.loudness_ebu128.loudness_range', 0.0):.2f}",
+            "bpm": f"{bpm:.1f}",
+            "danceability": f"{danceability_result:.2f}",
+            "key": f"{key} {scale}",
+            "dynamic_complexity": f"{dynamic_complexity:.2f}",
+            "loudness_range_db": f"{loudness_range:.2f}",
+            "zero_crossing_rate": f"{zcr:.4f}",
+            "tonalness": f"{tonalness:.2f}"
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
@@ -70,14 +86,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""
-        You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
+        You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following rich, objective data using the Essentia library: {json.dumps(essentia_data)}.
 
         Based ONLY on this rich technical data, provide a detailed assessment in a valid JSON format.
         
         Your analysis must cover these four categories:
-        1.  **Rhythm Quality:** Based on the BPM and Danceability score, infer the energy and potential catchiness.
-        2.  **Sound Quality:** Based on the Dynamic Complexity and Loudness Range, assess the production quality. A higher dynamic complexity and a balanced loudness range are signs of a professional mix.
-        3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
+        1.  **Rhythm Quality:** Based on the BPM ({essentia_data['bpm']}) and Danceability score ({essentia_data['danceability']}), infer the energy and potential catchiness.
+        2.  **Sound Quality:** Based on Dynamic Complexity ({essentia_data['dynamic_complexity']}), Loudness Range ({essentia_data['loudness_range_db']} dB), and Zero Crossing Rate ({essentia_data['zero_crossing_rate']}), assess the production quality. A higher dynamic complexity and a balanced loudness range suggest a professional mix. A lower ZCR suggests more tonal, less noisy content.
+        3.  **Market Potential:** Based on the danceability, key ({essentia_data['key']}), and tonalness ({essentia_data['tonalness']}), how well could this track perform in the current Afrobeats/African music market? High tonalness and danceability are strong positive indicators.
         4.  **Genre Relevance:** Based on all the data, use your expertise to infer the track's most likely genre and assess how well it fits and innovates within that genre.
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
