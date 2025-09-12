@@ -33,7 +33,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Final Unbreakable Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Final Assembly Line Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -43,15 +43,15 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: DEFINITIVE, UNBREAKABLE A LA CARTE ESSENTIA ANALYSIS ---
+        # --- STAGE 1: THE DEFINITIVE ESSENTIA ASSEMBLY LINE ---
         print("--- STAGE 1: DEFINITIVE ADVANCED ESSENTIA ANALYSIS ---")
         
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
-        print("Extracting advanced features a la carte to guarantee compatibility...")
+        print("Extracting features using the correct frame-based assembly line...")
         
-        # --- RHYTHM & KEY (ALL MONO-COMPATIBLE) ---
+        # --- ALGORITHMS FOR THE WHOLE FILE ---
         rhythm_extractor = es.RhythmExtractor2013()
         bpm, _, _, _, _ = rhythm_extractor(audio)
         danceability_algo = es.Danceability()
@@ -59,18 +59,37 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         key_extractor = es.KeyExtractor()
         key, scale, strength = key_extractor(audio)
 
-        # --- ADVANCED SOUND QUALITY METRICS (ALL MONO-COMPATIBLE) ---
-        dynamic_complexity_algo = es.DynamicComplexity()
-        dynamic_complexity, _ = dynamic_complexity_algo(audio)
+        # --- SETUP FOR FRAME-BASED (STREAMING) ALGORITHMS ---
+        frameSize = 2048
+        hopSize = 1024
         
-        # --- THE DEFINITIVE FIX: CORRECTING THE TYPO ---
+        # Initialize the algorithms we will run on each frame
+        spectrum_algo = es.Spectrum()
         spectral_contrast_algo = es.SpectralContrast()
-        # The variable name below now correctly matches the line above it.
-        spec_contrast, _, _, _ = spectral_contrast_algo(audio)
-        avg_spectral_contrast = np.mean(spec_contrast)
+        flatness_algo = es.Flatness()
+        dynamic_complexity_algo = es.DynamicComplexity()
 
-        spectral_flatness_algo = es.Flatness()
-        spectral_flatness = np.mean(spectral_flatness_algo(audio))
+        # Lists to store the results from each frame
+        spec_contrast_results = []
+        flatness_results = []
+        
+        # The main assembly line loop
+        for frame in es.FrameGenerator(audio, frameSize=frameSize, hopSize=hopSize, startFromZero=True):
+            spectrum = spectrum_algo(frame)
+            
+            # These algorithms require the spectrum as input
+            spec_contrast_frame, _, _, _ = spectral_contrast_algo(spectrum)
+            flatness_frame = flatness_algo(spectrum)
+            
+            spec_contrast_results.append(spec_contrast_frame)
+            flatness_results.append(flatness_frame)
+
+        # Calculate the average of the results from all frames
+        avg_spectral_contrast = np.mean(spec_contrast_results)
+        avg_flatness = np.mean(flatness_results)
+
+        # Dynamic complexity runs on the whole audio vector
+        dynamic_complexity, _ = dynamic_complexity_algo(audio)
 
         essentia_data = {
             "bpm": f"{bpm:.1f}",
@@ -78,14 +97,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
             "key": f"{key} {scale}",
             "dynamic_complexity": f"{dynamic_complexity:.2f}",
             "spectral_contrast": f"{avg_spectral_contrast:.2f}",
-            "spectral_flatness": f"{spectral_flatness:.4f}"
+            "spectral_flatness": f"{avg_flatness:.4f}"
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
         # --- STAGE 2: UPGRADED GEMINI ANALYSIS ---
         print("\n--- STAGE 2: UPGRADED GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following rich, objective data using the Essentia library: {json.dumps(essentia_data)}.
