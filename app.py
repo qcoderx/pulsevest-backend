@@ -64,7 +64,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         # --- STAGE 2: GEMINI ANALYSIS (THE FINAL ENGINE) ---
         print("\n--- STAGE 2: GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
@@ -79,7 +79,7 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
-        Your final output MUST be a single, valid JSON object with no extra text or markdown formatting.
+        Your final output MUST be a single, valid JSON object with no extra text or markdown formatting. The top-level key of this object should be "analysis".
         """
         
         print("Contacting Gemini 1.5 Flash...")
@@ -99,9 +99,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         # --- THIS IS THE FINAL, DEFINITIVE TRANSLATOR ---
         print("\n--- STAGE 3: TRANSLATING BLUEPRINT FOR FRONTEND ---")
         
+        # 1. Open the main shipping box and get the smaller "analysis" box
+        analysis_data = gemini_result.get("analysis")
+        if not analysis_data:
+            raise ValueError("The 'analysis' key was not found in the AI's response.")
+
         scores_for_frontend = []
-        # We iterate through the AI's response to build the correct format
-        for key, value in gemini_result.items():
+        # 2. We now iterate through the CORRECT inner box
+        for key, value in analysis_data.items():
             if isinstance(value, dict) and 'score' in value and 'explanation' in value:
                 scores_for_frontend.append({
                     "category": key,
@@ -109,10 +114,10 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
                     "explanation": value["explanation"]
                 })
 
-        # We construct the final, perfect object for the frontend
+        # 3. We build the final, perfect object from the CORRECT inner box
         final_response_for_frontend = {
-            "pulseScore": gemini_result.get("Pulse Score"),
-            "suggestions": gemini_result.get("Suggestions"),
+            "pulseScore": analysis_data.get("Pulse Score"),
+            "suggestions": analysis_data.get("Suggestions"),
             "scores": scores_for_frontend
         }
         
