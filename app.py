@@ -73,7 +73,7 @@ def analyze_audio(filename: str, mime_type: str):
     if audio_file.state.name == "FAILED":
         raise ValueError("Google Cloud file processing failed for audio.")
         
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     You are an expert A&R and music analyst for PulseVest. I have uploaded an audio file for your direct review.
@@ -113,7 +113,7 @@ def analyze_video(filename: str, mime_type: str):
     if video_file.state.name == "FAILED":
         raise ValueError("Google Cloud file processing failed for video.")
         
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 
     prompt = f"""
     You are an expert film critic and market analyst for PulseVest. I have uploaded a video file for your review.
