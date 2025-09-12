@@ -73,9 +73,8 @@ def analyze_audio(filename: str, mime_type: str):
     if audio_file.state.name == "FAILED":
         raise ValueError("Google Cloud file processing failed for audio.")
         
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
-    # --- THE FULL, UNABRIDGED AUDIO PROMPT ---
     prompt = f"""
     You are an expert A&R and music analyst for PulseVest. I have uploaded an audio file for your direct review.
 
@@ -94,7 +93,7 @@ def analyze_audio(filename: str, mime_type: str):
 
     print("Contacting Gemini for audio analysis...")
     response = model.generate_content([prompt, audio_file])
-    genai.delete_file(audio_file.name) # Cleanup the file
+    genai.delete_file(audio_file.name)
     print("Gemini analysis complete and file deleted.")
     
     gemini_result = json.loads(response.text.replace('```json', '').replace('```', '').strip())
@@ -114,9 +113,8 @@ def analyze_video(filename: str, mime_type: str):
     if video_file.state.name == "FAILED":
         raise ValueError("Google Cloud file processing failed for video.")
         
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-    # --- THE FULL, UNABRIDGED VIDEO PROMPT ---
     prompt = f"""
     You are an expert film critic and market analyst for PulseVest. I have uploaded a video file for your review.
 
@@ -135,24 +133,33 @@ def analyze_video(filename: str, mime_type: str):
     
     print("Contacting Gemini for video analysis...")
     response = model.generate_content([prompt, video_file])
-    genai.delete_file(video_file.name) # Cleanup the file
+    genai.delete_file(video_file.name)
     print("Gemini analysis complete and file deleted.")
 
     gemini_result = json.loads(response.text.replace('```json', '').replace('```', '').strip())
     return translate_response_for_frontend(gemini_result)
 
 
+def find_value_case_insensitive(data_dict: dict, target_key: str):
+    """A robust function to find a key in a dictionary, ignoring case, spaces, and underscores."""
+    target_key_normalized = target_key.lower().replace("_", "").replace(" ", "")
+    for key, value in data_dict.items():
+        key_normalized = str(key).lower().replace("_", "").replace(" ", "")
+        if key_normalized == target_key_normalized:
+            return value
+    return None # Return None if no match is found
+
+
 def translate_response_for_frontend(gemini_result: dict):
     """Takes the raw Gemini JSON and formats it perfectly for the frontend, handling inconsistencies."""
-    print("--- STAGE 3: RUNNING UNBREAKABLE TRANSLATOR ---")
+    print("--- STAGE 3: RUNNING UNBREAKABLE TRANSLATOR V2 ---")
     
     analysis_data = gemini_result.get("analysis")
     if not analysis_data:
         raise ValueError("The 'analysis' key was not found in the AI's response.")
 
-    case_insensitive_data = {str(k).lower().replace("_", " "): v for k, v in analysis_data.items()}
-
     scores_for_frontend = []
+    # We now iterate through the original data to preserve the category names
     for key, value in analysis_data.items():
         if isinstance(value, dict) and 'score' in value and 'explanation' in value:
             scores_for_frontend.append({
@@ -161,9 +168,13 @@ def translate_response_for_frontend(gemini_result: dict):
                 "explanation": value["explanation"]
             })
 
+    # --- THE DEFINITIVE FIX: USING THE INTELLIGENT FINDER FUNCTION ---
+    pulse_score = find_value_case_insensitive(analysis_data, "Pulse Score")
+    suggestions = find_value_case_insensitive(analysis_data, "Suggestions")
+
     final_response = {
-        "pulseScore": case_insensitive_data.get("pulse score"),
-        "suggestions": case_insensitive_data.get("suggestions"),
+        "pulseScore": pulse_score,
+        "suggestions": suggestions,
         "scores": scores_for_frontend
     }
     
