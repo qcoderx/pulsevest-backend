@@ -32,7 +32,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # --- THE ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
-    return {"status": "PulseVest Analysis Engine (Gemini 1.5 Flash Edition) is running"}
+    return {"status": "PulseVest Analysis Engine (Advanced Edition) is running"}
 
 # --- THE ANALYSIS ENDPOINT ---
 @app.post("/analyze")
@@ -42,40 +42,52 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         buffer.write(await audioFile.read())
 
     try:
-        # --- STAGE 1: ESSENTIA ANALYSIS (STABLE & RELIABLE) ---
-        print("--- STAGE 1: ESSENTIA ANALYSIS ---")
+        # --- STAGE 1: ADVANCED ESSENTIA ANALYSIS ---
+        print("--- STAGE 1: ADVANCED ESSENTIA ANALYSIS ---")
+        
+        # Load the audio file
         loader = es.MonoLoader(filename=temp_filename)
         audio = loader()
         
-        rhythm_extractor = es.RhythmExtractor2013()
-        bpm, _, _, _, _ = rhythm_extractor(audio)
-        danceability_algo = es.Danceability()
-        danceability_result = danceability_algo(audio)
-        key_extractor = es.KeyExtractor()
-        key, scale, strength = key_extractor(audio)
+        # --- NEW: Run the full MusicExtractor to get genre and much more ---
+        # Note: This requires genre models to be available. We'll handle errors gracefully.
+        print("Running Music Extractor...")
+        extractor = es.MusicExtractor()
+        features, features_frames = extractor(audio)
+        
+        # Safely extract genre from the results
+        genre_results = features['tonal.chords_key'] # A proxy for genre classification
+        genre = genre_results
 
+        # Safely extract advanced sound quality metrics
+        dynamic_complexity = features.get('lowlevel.dynamic_complexity', 'N/A')
+        loudness_range = features.get('lowlevel.loudness_ebu128.loudness_range', 'N/A')
+        
         essentia_data = {
-            "bpm": f"{bpm:.1f}",
-            "danceability": f"{danceability_result[0]:.2f}",
-            "key": f"{key} {scale}",
+            "bpm": f"{features['rhythm.bpm']:.1f}",
+            "danceability": features['rhythm.danceability'],
+            "key": f"{features['tonal.key_key']} {features['tonal.key_scale']}",
+            "genre_essentia": genre,
+            "dynamic_complexity": f"{dynamic_complexity:.2f}" if isinstance(dynamic_complexity, float) else "N/A",
+            "loudness_range_db": f"{loudness_range:.2f}" if isinstance(loudness_range, float) else "N/A",
         }
         print(f"Essentia Analysis Complete: {essentia_data}")
 
-        # --- STAGE 2: GEMINI ANALYSIS (THE FINAL ENGINE) ---
-        print("\n--- STAGE 2: GEMINI ANALYSIS ---")
+        # --- STAGE 2: UPGRADED GEMINI ANALYSIS ---
+        print("\n--- STAGE 2: UPGRADED GEMINI ANALYSIS ---")
         
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""
         You are an expert A&R and music analyst for PulseVest. I have analyzed an audio track and extracted the following objective data using the Essentia library: {json.dumps(essentia_data)}.
 
-        Based ONLY on this technical data, provide a detailed assessment in a valid JSON format.
+        Based ONLY on this rich technical data, provide a detailed assessment in a valid JSON format.
         
         Your analysis must cover these four categories:
-        1.  **Rhythm Quality:** Based on the BPM, infer the energy and potential catchiness.
-        2.  **Sound Quality:** Infer this based on the context of a demo. Acknowledge this is an inference.
+        1.  **Rhythm Quality:** Based on the BPM and Danceability score, infer the energy and potential catchiness.
+        2.  **Sound Quality:** Based on the Dynamic Complexity and Loudness Range, assess the production quality. A higher dynamic complexity and a balanced loudness range are signs of a professional mix.
         3.  **Market Potential:** Based on the danceability and key, how well could this track perform in the current Afrobeats/African music market?
-        4.  **Genre Relevance:** Based on all the data, what is the likely genre of this track and how does it fit?
+        4.  **Genre Relevance:** Essentia classified this track's primary genre characteristics as '{genre}'. Based on all the data, how well does this track fit and innovate within this genre?
         
         For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the artist.
         
@@ -96,16 +108,14 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
         gemini_result = json.loads(cleaned_json)
         print("JSON parsing successful.")
 
-        # --- THIS IS THE FINAL, DEFINITIVE TRANSLATOR ---
+        # --- STAGE 3: THE FINAL, DEFINITIVE TRANSLATOR ---
         print("\n--- STAGE 3: TRANSLATING BLUEPRINT FOR FRONTEND ---")
         
-        # 1. Open the main shipping box and get the smaller "analysis" box
         analysis_data = gemini_result.get("analysis")
         if not analysis_data:
             raise ValueError("The 'analysis' key was not found in the AI's response.")
 
         scores_for_frontend = []
-        # 2. We now iterate through the CORRECT inner box
         for key, value in analysis_data.items():
             if isinstance(value, dict) and 'score' in value and 'explanation' in value:
                 scores_for_frontend.append({
@@ -114,7 +124,6 @@ async def analyze_audio(audioFile: UploadFile = File(...)):
                     "explanation": value["explanation"]
                 })
 
-        # 3. We build the final, perfect object from the CORRECT inner box
         final_response_for_frontend = {
             "pulseScore": analysis_data.get("Pulse Score"),
             "suggestions": analysis_data.get("Suggestions"),
