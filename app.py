@@ -14,7 +14,7 @@ load_dotenv()
 app = FastAPI()
 
 # Configure CORS
-origins = ["http://localhost:3000", "https://*.vercel.app"] 
+origins = ["http://localhost:3000", "https://pulsevest.vercel.app"] 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
