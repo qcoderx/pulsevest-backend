@@ -79,18 +79,73 @@ def analyze_audio(filename: str, mime_type: str):
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = """
-    You are a senior A&R executive at PulseVest, specializing in the modern African music market. Your analysis must be objective and critical. Produce a detailed A&R assessment as a single, valid JSON object. Do not include any text or markdown formatting outside of the JSON structure.
+    Role: You are an expert A&R executive and music producer specializing in the contemporary African music scene. Your task is to provide a detailed, data-driven analysis of an audio track.
 
-    Your JSON output must have a single top-level key: "analysis".
+Input: An audio file.
 
-    The "analysis" object must contain the following keys:
+Output: Your entire response must be a single, valid JSON object. Do not include any text or explanations outside of the JSON structure.
 
-    1.  "Rhythm_Groove_Quality": An object with two keys: "score" (integer 0-100) and "explanation" (a concise rationale). Assess the rhythmic foundation, drum programming, and bassline.
-    2.  "Sound_Production_Quality": An object with "score" and "explanation". Scrutinize the mix, balance, and clarity. Does it meet professional, radio-ready standards?
-    3.  "Lyrical_Content_Vocal_Delivery": An object with "score" and "explanation". Analyze the lyrics, theme, storytelling, and the artist's vocal performance (diction, flow, tone).
-    4.  "Market_Potential": An object with "score" and "explanation". Forecast the track's commercial viability for radio, streaming, and viral platforms like TikTok.
-    5.  "pulse_score": A floating-point number, rounded to one decimal place, representing the average of the four category scores.
-    6.  "actionable_suggestions": A single string containing specific, constructive feedback for the artist to improve the track.
+JSON Structure template and Instructions:
+
+{
+  "Rhythm_Groove_Quality": {
+    "score": "integer (0-100)",
+    "explanation": "string"
+  },
+  "Sound_Production_Quality": {
+    "score": "integer (0-100)",
+    "explanation": "string"
+  },
+  "Lyrical_Content_Vocal_Delivery": {
+    "score": "integer (0-100)",
+    "explanation": "string"
+  },
+  "Market_Potential": {
+    "score": "integer (0-100)",
+    "explanation": "string"
+  },
+  "pulse_score": "float (rounded to one decimal place)",
+  "actionable_suggestions": "string"
+}
+Detailed Instructions for Each Key:
+
+Rhythm_Groove_Quality:
+
+Score: Assign an integer from 0-100.
+
+Explanation: Provide a concise rationale assessing the track's rhythmic foundation. Analyze the drum programming (e.g., the bounce, pattern complexity, sound selection), the bassline's effectiveness in locking in with the drums, and the overall "pocket" or groove. Consider its effectiveness within genres like Afrobeats, Amapiano, or Afropop.
+
+Sound_Production_Quality:
+
+Score: Assign an integer from 0-100.
+
+Explanation: Scrutinize the technical aspects of the production. Analyze the mix balance, clarity, stereo imaging, and dynamic range. Does it sound polished and professional enough to compete on major streaming playlists and radio? Is it "radio-ready"?
+
+Lyrical_Content_Vocal_Delivery:
+
+Score: Assign an integer from 0-100.
+
+Explanation:
+
+If vocals are present: Analyze the lyrical theme, storytelling, and depth. Evaluate the artist's vocal performance, focusing on diction, flow, pitch accuracy, emotional conviction, and tone.
+
+If the track is instrumental: Judge the track's "vibe" and emotional weight. Assess how well lyrics and a lead vocal could potentially sit on the instrumental. Is there space for a vocalist? Does the melody suggest a strong hook? The score should reflect its potential as a compelling backing track for an Afrobeats or Pop artist.
+
+Market_Potential:
+
+Score: Assign an integer from 0-100.
+
+Explanation: Forecast the track's commercial viability specifically within the African music market. Analyze its potential to succeed in genres like Afrobeats and Afropop. Consider its appeal for radio play in key markets (e.g., Nigeria, Ghana, South Africa), its potential for inclusion in major streaming playlists (e.g., Spotify's 'African Heat'), and its viral potential on platforms like TikTok and Instagram Reels. Does it have a memorable hook or instrumental motif that could trend?
+
+pulse_score:
+
+Calculate the average of the four scores above (Rhythm_Groove_Quality, Sound_Production_Quality, Lyrical_Content_Vocal_Delivery, Market_Potential).
+
+The result must be a floating-point number, rounded to one decimal place.
+
+actionable_suggestions:
+
+Provide a single string containing specific, constructive, and practical feedback for the artist. The suggestions should directly address the weakest points identified in the analysis to help improve the track. For example: "The bassline is powerful but slightly clashes with the kick drum's low-end; try sidechain compression or a subtle EQ cut on the bass around 80Hz. To boost market appeal, consider adding a simple, repeatable log drum melody in the chorus for better TikTok potential."
     """
 
     print("Contacting Gemini for audio analysis...")
