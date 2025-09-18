@@ -14,7 +14,11 @@ load_dotenv()
 app = FastAPI()
 
 # Configure CORS
-origins = ["http://localhost:3000", "https://pulsevest.vercel.app", "http://10.114.6.123:3000"] 
+origins = [
+    "http://localhost:3000",
+    "https://pulsevest.vercel.app",
+    "http://10.114.6.123:3000"
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -23,21 +27,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- THE FINAL, DEFINITIVE, AND WORKING GEMINI CONFIGURATION ---
+# --- GEMINI CONFIGURATION ---
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 if not GOOGLE_API_KEY:
-    raise ValueError("GOOGLE_API_KEY not found in .env file. Please add it to your .env file.")
+    raise ValueError("GOOGLE_API_KEY not found in .env file.")
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# --- THE ROOT ENDPOINT ---
+# --- ROOT ENDPOINT ---
 @app.get("/")
 def read_root():
     return {"status": "PulseVest Multimodal Analysis Engine is running"}
 
-# --- THE UNIFIED ANALYSIS ENDPOINT ---
+# --- UNIFIED ANALYSIS ENDPOINT ---
 @app.post("/analyze")
 async def analyze_media(audioFile: UploadFile = File(...)):
-    temp_filename = f"temp_{audioFile.filename}"
+    temp_filename = f"temp_{int(time.time())}_{audioFile.filename}"
     with open(temp_filename, "wb") as buffer:
         buffer.write(await audioFile.read())
 
@@ -50,10 +54,10 @@ async def analyze_media(audioFile: UploadFile = File(...)):
         elif file_mime_type.startswith('video/'):
             return analyze_video(temp_filename, file_mime_type)
         else:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_mime_type}. Please upload audio or video.")
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_mime_type}.")
 
     except Exception as e:
-        print(f"A CRITICAL ERROR OCCURRED in main handler: {e}")
+        print(f"A CRITICAL ERROR OCCURRED: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -61,11 +65,10 @@ async def analyze_media(audioFile: UploadFile = File(...)):
             os.remove(temp_filename)
 
 def analyze_audio(filename: str, mime_type: str):
-    """Handles the direct Gemini analysis for audio files."""
-    print("--- Running PURE Gemini Audio Analysis Pipeline ---")
+    print("--- Running Gemini Audio Analysis ---")
     
-    print(f"Uploading audio file to Google: {filename}")
-    audio_file = genai.upload_file(path=filename, mime_type=mime_type)
+    print(f"Uploading audio file: {filename}")
+    audio_file = genai.upload_file(path=filename)
     while audio_file.state.name == "PROCESSING":
         print("Waiting for audio processing...")
         time.sleep(5)
@@ -73,35 +76,21 @@ def analyze_audio(filename: str, mime_type: str):
     if audio_file.state.name == "FAILED":
         raise ValueError("Google Cloud file processing failed for audio.")
         
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
-    prompt = f"""
-    You are the senior A&R executive and music analyst at PulseVest, a leading investment firm specializing in the modern African music market. Your analysis must be objective, critical, and grounded in current industry standards. High scores should be reserved for tracks that demonstrate exceptional quality and potential; do not inflate scores.
+    prompt = """
+    You are a senior A&R executive at PulseVest, specializing in the modern African music market. Your analysis must be objective and critical. Produce a detailed A&R assessment as a single, valid JSON object. Do not include any text or markdown formatting outside of the JSON structure.
 
-You will be provided with an audio file for direct, in-depth review. Based ONLY on the audio content, your primary objective is to produce a detailed, professional A&R assessment formatted as a single, valid JSON object.
+    Your JSON output must have a single top-level key: "analysis".
 
-Do not include any introductory text, concluding remarks, or markdown formatting (like ```json) outside of the JSON structure itself.
+    The "analysis" object must contain the following keys:
 
-Your analysis must cover these four core categories:
-
-Rhythm & Groove Quality: Critically assess the rhythmic foundation of the track. Evaluate the drum programming, the effectiveness of the bassline, and the overall "pocket" or groove. Is the rhythm compelling, innovative, and well-executed? Does it possess a catchy, memorable quality that fits the intended commercial landscape?
-
-Sound & Production Quality: Scrutinize the technical execution and production value. Is the mix clean, balanced, and dynamic, or is it cluttered and muddy? Are the vocals and instruments clear and well-processed? Does the track meet the sonic standards of a professional, radio-ready release, or does it sound like a raw demo?
-
-Lyrical Content & Vocal Delivery: Analyze the substance and execution of the lyrics and vocals. Evaluate the theme, storytelling, wordplay, and emotional resonance of the lyrics. Assess the artist's vocal performance, including their diction, flow, cadence, and tonal quality. Do the lyrics and delivery effectively convey the song's message and emotion?
-
-Market Potential: Forecast the track's commercial viability in the current Afrobeats/African music market. Does it have clear potential for radio airplay, streaming playlist inclusion, or viral success on platforms like TikTok and Reels? Define its likely target audience and its overall commercial appeal.
-
-For each of the four categories, you must provide:
-
-A score (an integer from 0 to 100).
-
-A rationale (a concise, one- to two-sentence explanation justifying the score).
-
-After assessing the four categories, calculate the final pulse_score by averaging the four individual category scores. The result should be a floating-point number, rounded to one decimal place.
-
-Finally, provide a section for actionable_suggestions. This must be an object containing specific, constructive feedback for the artist. This feedback should be broken down into at least three of the following sub-keys: production_mix, arrangement, vocal_performance, lyrics, or marketing. Each suggestion must be a clear, actionable sentence designed to improve the final product.
-    Your final output MUST be a single, valid JSON object with no extra text or markdown formatting. The top-level key of this object should be "analysis".
+    1.  "Rhythm_Groove_Quality": An object with two keys: "score" (integer 0-100) and "explanation" (a concise rationale). Assess the rhythmic foundation, drum programming, and bassline.
+    2.  "Sound_Production_Quality": An object with "score" and "explanation". Scrutinize the mix, balance, and clarity. Does it meet professional, radio-ready standards?
+    3.  "Lyrical_Content_Vocal_Delivery": An object with "score" and "explanation". Analyze the lyrics, theme, storytelling, and the artist's vocal performance (diction, flow, tone).
+    4.  "Market_Potential": An object with "score" and "explanation". Forecast the track's commercial viability for radio, streaming, and viral platforms like TikTok.
+    5.  "pulse_score": A floating-point number, rounded to one decimal place, representing the average of the four category scores.
+    6.  "actionable_suggestions": A single string containing specific, constructive feedback for the artist to improve the track.
     """
 
     print("Contacting Gemini for audio analysis...")
@@ -109,16 +98,18 @@ Finally, provide a section for actionable_suggestions. This must be an object co
     genai.delete_file(audio_file.name)
     print("Gemini analysis complete and file deleted.")
     
-    gemini_result = json.loads(response.text.replace('```json', '').replace('```', '').strip())
+    # Clean the response text before parsing
+    cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
+    gemini_result = json.loads(cleaned_text)
+    
     return translate_response_for_frontend(gemini_result)
 
 
 def analyze_video(filename: str, mime_type: str):
-    """Handles the direct Gemini analysis for video files."""
-    print("--- Running PURE Gemini Video Analysis Pipeline ---")
+    print("--- Running Gemini Video Analysis ---")
     
-    print(f"Uploading video file to Google: {filename}")
-    video_file = genai.upload_file(path=filename, mime_type=mime_type)
+    print(f"Uploading video file: {filename}")
+    video_file = genai.upload_file(path=filename)
     while video_file.state.name == "PROCESSING":
         print("Waiting for video processing...")
         time.sleep(10)
@@ -126,22 +117,21 @@ def analyze_video(filename: str, mime_type: str):
     if video_file.state.name == "FAILED":
         raise ValueError("Google Cloud file processing failed for video.")
         
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
-    prompt = f"""
-    You are an expert film critic and market analyst for PulseVest. I have uploaded a video file for your review.
+    prompt = """
+    You are an expert film critic for PulseVest. Based ONLY on the video content, provide a detailed assessment in a valid JSON object. Do not include any text or markdown formatting outside of the JSON structure.
 
-    Based ONLY on the video content, provide a detailed assessment in a valid JSON format.
-    
-    Your analysis must cover these four categories:
-    1.  **Storyline & Narrative:** How compelling is the plot? Is the pacing effective? Does the story make sense?
-    2.  **Acting Quality:** Assess the performances of the main actors. Are they believable and engaging?
-    3.  **Market Potential:** How well could this film perform in the current Nollywood/African film market? Does it have viral or festival potential?
-    4.  **Cinematography & Visuals:** How strong is the visual storytelling? Assess the camera work, lighting, color grading, and overall aesthetic.
-    
-    For each category, provide a score from 0 to 100 and a concise, one-sentence explanation. Calculate the final "Pulse Score" by averaging the four scores. Finally, provide a paragraph of actionable "Suggestions" for the filmmaker.
-    
-    Your final output MUST be a single, valid JSON object with no extra text or markdown formatting. The top-level key of this object should be "analysis".
+    Your JSON output must have a single top-level key: "analysis".
+
+    The "analysis" object must contain the following keys:
+
+    1.  "Storyline_Narrative": An object with "score" (integer 0-100) and "explanation" (a concise rationale).
+    2.  "Acting_Quality": An object with "score" and "explanation".
+    3.  "Market_Potential": An object with "score" and "explanation".
+    4.  "Cinematography_Visuals": An object with "score" and "explanation".
+    5.  "pulse_score": A floating-point number, rounded to one decimal place, representing the average of the four scores.
+    6.  "suggestions": A single string of actionable feedback for the filmmaker.
     """
     
     print("Contacting Gemini for video analysis...")
@@ -149,41 +139,43 @@ def analyze_video(filename: str, mime_type: str):
     genai.delete_file(video_file.name)
     print("Gemini analysis complete and file deleted.")
 
-    gemini_result = json.loads(response.text.replace('```json', '').replace('```', '').strip())
+    cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
+    gemini_result = json.loads(cleaned_text)
+    
     return translate_response_for_frontend(gemini_result)
 
 
-def find_value_case_insensitive(data_dict: dict, target_key: str):
-    """A robust function to find a key in a dictionary, ignoring case, spaces, and underscores."""
-    target_key_normalized = target_key.lower().replace("_", "").replace(" ", "")
-    for key, value in data_dict.items():
-        key_normalized = str(key).lower().replace("_", "").replace(" ", "")
-        if key_normalized == target_key_normalized:
-            return value
-    return None # Return None if no match is found
-
-
 def translate_response_for_frontend(gemini_result: dict):
-    """Takes the raw Gemini JSON and formats it perfectly for the frontend, handling inconsistencies."""
-    print("--- STAGE 3: RUNNING UNBREAKABLE TRANSLATOR V2 ---")
+    """
+    Takes the raw Gemini JSON and robustly formats it for the frontend.
+    This is the definitive fix to handle potential AI inconsistencies.
+    """
+    print("--- Running Robust Response Translator ---")
     
     analysis_data = gemini_result.get("analysis")
-    if not analysis_data:
-        raise ValueError("The 'analysis' key was not found in the AI's response.")
+    if not analysis_data or not isinstance(analysis_data, dict):
+        raise ValueError("The 'analysis' key was not found or is not a dictionary.")
 
     scores_for_frontend = []
-    # We now iterate through the original data to preserve the category names
+    
+    # Iterate through all items in the analysis data
     for key, value in analysis_data.items():
+        # Find any item that looks like a category score
         if isinstance(value, dict) and 'score' in value and 'explanation' in value:
+            # Format the category name for readability
+            category_name = key.replace('_', ' ').title()
             scores_for_frontend.append({
-                "category": key,
-                "score": value["score"],
-                "explanation": value["explanation"]
+                "category": category_name,
+                "score": value.get("score"),
+                "explanation": value.get("explanation")
             })
 
-    # --- THE DEFINITIVE FIX: USING THE INTELLIGENT FINDER FUNCTION ---
-    pulse_score = find_value_case_insensitive(analysis_data, "Pulse Score")
-    suggestions = find_value_case_insensitive(analysis_data, "Suggestions")
+    # Find pulse_score and suggestions using multiple possible keys
+    pulse_score = analysis_data.get("pulse_score") or analysis_data.get("pulseScore")
+    suggestions = analysis_data.get("actionable_suggestions") or analysis_data.get("suggestions")
+
+    if not pulse_score or not scores_for_frontend:
+        raise ValueError(f"Could not parse essential data from AI response: {analysis_data}")
 
     final_response = {
         "pulseScore": pulse_score,
@@ -191,9 +183,9 @@ def translate_response_for_frontend(gemini_result: dict):
         "scores": scores_for_frontend
     }
     
-    print(f"Translation complete. Final data: {final_response}")
+    print(f"Translation complete. Final data: {json.dumps(final_response, indent=2)}")
     return final_response
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
 
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
